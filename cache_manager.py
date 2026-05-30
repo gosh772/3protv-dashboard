@@ -1,12 +1,9 @@
 """
 cache_manager.py
 SQLite를 사용해 처리된 영상 요약을 로컬에 저장합니다.
-중복 API 호출을 방지하여 비용을 절감합니다.
 """
 
 import sqlite3
-import json
-import os
 from pathlib import Path
 
 DB_PATH = Path(__file__).parent / "cache" / "summaries.db"
@@ -25,14 +22,14 @@ class CacheManager:
         with self._conn() as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS summaries (
-                    video_id    TEXT PRIMARY KEY,
-                    title       TEXT,
+                    video_id     TEXT PRIMARY KEY,
+                    title        TEXT,
                     published_at TEXT,
-                    url         TEXT,
-                    cast        TEXT,
-                    summary     TEXT,
-                    description TEXT,
-                    cached_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+                    url          TEXT,
+                    cast_info    TEXT,
+                    summary      TEXT,
+                    description  TEXT,
+                    cached_at    DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             """)
             conn.commit()
@@ -47,7 +44,7 @@ class CacheManager:
     def get(self, video_id: str) -> dict | None:
         with self._conn() as conn:
             row = conn.execute(
-                "SELECT video_id, title, published_at, url, cast, summary, description "
+                "SELECT video_id, title, published_at, url, cast_info, summary, description "
                 "FROM summaries WHERE video_id = ?",
                 (video_id,),
             ).fetchone()
@@ -60,7 +57,7 @@ class CacheManager:
         with self._conn() as conn:
             conn.execute("""
                 INSERT OR REPLACE INTO summaries
-                    (video_id, title, published_at, url, cast, summary, description)
+                    (video_id, title, published_at, url, cast_info, summary, description)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (
                 data.get("video_id"),
@@ -76,7 +73,7 @@ class CacheManager:
     def get_all(self) -> list[dict]:
         with self._conn() as conn:
             rows = conn.execute(
-                "SELECT video_id, title, published_at, url, cast, summary, description "
+                "SELECT video_id, title, published_at, url, cast_info, summary, description "
                 "FROM summaries ORDER BY published_at DESC"
             ).fetchall()
         keys = ["video_id", "title", "published_at", "url", "cast", "summary", "description"]

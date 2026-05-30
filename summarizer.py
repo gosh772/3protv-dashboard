@@ -60,7 +60,7 @@ def _call_gemini_with_url(url: str, title: str) -> str:
 
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash-latest",
+            model_name="gemini-2.5-flash-latest",
             system_instruction=SYSTEM_PROMPT,
         )
 

@@ -1,7 +1,5 @@
 """
-summarizer.py
-Gemini 2.5 Flash-Lite로 YouTube 영상을 상세 요약합니다.
-Rate limit 방지를 위해 요청 사이에 자동 대기합니다.
+summarizer.py - 할루시네이션 최소화, 확실한 내용만 요약
 """
 
 import os
@@ -11,46 +9,43 @@ from dotenv import load_dotenv
 load_dotenv()
 
 SYSTEM_PROMPT = """당신은 금융·경제 방송 요약 전문가입니다.
-주어진 유튜브 영상을 직접 시청하고 아래 형식으로 상세하게 요약하세요.
+주어진 유튜브 영상을 직접 시청하고 아래 형식으로 요약하세요.
 
-[요약 품질 기준]
-- 단순한 한두 줄 요약이 아닌, 영상의 핵심 논지와 주요 주장을 구체적으로 서술하세요
-- 출연자가 실제로 언급한 수치, 정책명, 종목명, 전망 근거를 포함하세요
-- 각 항목당 3~5문장 분량으로 충분히 설명하세요
-- 분/초 타임스탬프는 포함하지 마세요
+[매우 중요한 규칙]
+- 영상에서 실제로 언급된 내용만 작성하세요. 추측하거나 만들어내지 마세요.
+- 목표가, 수치, 종목명은 출연자가 직접 말한 경우에만 작성하세요.
+- 확실하지 않은 내용은 절대 포함하지 말고, 해당 항목을 '언급 없음'으로 표시하세요.
+- 분/초 타임스탬프는 포함하지 마세요.
+- 출연자가 실제로 언급한 종목명, 정책명, 수치만 사용하세요.
 
 [출력 형식]
 
 🎙️ 영상 개요:
-(어떤 출연자가 어떤 주제로 출연했는지 2~3문장으로 설명)
+(어떤 출연자가 어떤 주제로 출연했는지 2~3문장)
 
 📈 시황 동향:
-(언급된 시장 분위기, 지수, 섹터 흐름 등. 없으면 '해당 없음')
+(영상에서 실제 언급된 시장 흐름. 없으면 '해당 없음')
 
 📌 주요 언급 종목 & 전망:
-(종목별 줄바꿈. 긍정=🔥, 부정=⚠️, 중립=공백)
-🔥 종목명: 구체적 이유와 전망
-⚠️ 종목명: 구체적 리스크
-(주식 관련 내용이 없으면 '해당 없음')
+(출연자가 실제로 언급한 종목만. 긍정=🔥, 부정=⚠️, 중립=공백. 목표가는 직접 언급한 경우에만)
+(없으면 '해당 없음')
 
-🔑 핵심 내용 요약:
-(영상에서 다룬 주요 토픽을 bullet point로 3~5개 정리. 각 항목은 2~3문장으로 구체적으로)
-• 토픽1: 설명
-• 토픽2: 설명
-• 토픽3: 설명
+🔑 핵심 내용:
+(영상에서 다룬 주요 토픽 3~5개를 bullet로. 실제 언급 내용만)
+• 토픽: 설명
+• 토픽: 설명
 
-🔮 출연자 전망 및 의견:
-(출연자가 강조한 핵심 주장과 근거를 구체적으로)
+🔮 출연자 전망:
+(실제 발언 기반. 추측 금지)
 
 🌐 거시경제:
-(금리, 환율, 글로벌 이슈 등. 없으면 '해당 없음')
+(실제 언급된 금리/환율/글로벌 이슈. 없으면 '해당 없음')
 
 💡 핵심 요점:
-(영상 전체를 관통하는 핵심 메시지 1~2문장)
+(영상 핵심 메시지 1~2문장)
 
 ⭐ 오늘의 주목 투자 포인트:
-(매수/매도/비중확대 등 구체적 액션이 언급된 경우만. 없으면 이 항목 전체 생략)
-→ 종목명 매수/매도, 목표가 OOO원 (근거: ...)"""
+(출연자가 직접 매수/매도/목표가를 언급한 경우에만. 없으면 이 항목 완전 생략)"""
 
 
 def summarize_video(video: dict, llm: str = "Gemini", skip_no_transcript: bool = False) -> dict:
@@ -78,13 +73,12 @@ def _call_gemini_with_url(url: str, title: str) -> str:
 
         prompt = f"""{SYSTEM_PROMPT}
 
-아래 유튜브 영상을 직접 시청하고 형식에 맞게 상세히 요약해주세요.
-
 [영상 제목]: {title}
-[영상 링크]: {url}"""
+[영상 링크]: {url}
 
-        # 분당 10개 제한 → 영상 1개당 7초 대기 (안전 마진 포함)
-        time.sleep(7)
+반드시 영상에서 실제로 언급된 내용만 요약하세요. 목표가나 수치는 출연자가 직접 말한 경우에만 포함하세요."""
+
+        time.sleep(7)  # 분당 10개 제한 방지
 
         response = client.models.generate_content(
             model="gemini-2.5-flash-lite",
@@ -92,17 +86,13 @@ def _call_gemini_with_url(url: str, title: str) -> str:
         )
         return response.text
 
-    except ImportError:
-        return "❌ google-genai 패키지가 없습니다."
     except Exception as e:
         error_msg = str(e)
-        # 429 오류 시 30초 대기 후 1회 재시도
         if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
             time.sleep(30)
             try:
                 from google import genai
-                api_key = os.getenv("GEMINI_API_KEY")
-                client = genai.Client(api_key=api_key)
+                client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
                 response = client.models.generate_content(
                     model="gemini-2.5-flash-lite",
                     contents=f"{SYSTEM_PROMPT}\n\n[영상 제목]: {title}\n[영상 링크]: {url}",

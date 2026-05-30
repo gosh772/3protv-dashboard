@@ -21,7 +21,7 @@ load_dotenv()
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 # 삼프로TV 채널 ID (핸들 @3protv → 실제 channel ID)
-CHANNEL_ID = "UCsJ6RuBiWBv0RAQWD2PDQMQ"
+CHANNEL_ID = "UChlv4GSd7OQl3js-jkLOnFA"
 
 
 def _build_service():

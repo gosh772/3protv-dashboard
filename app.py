@@ -24,12 +24,13 @@ st.markdown("""
 .card-summary {
     font-size: 0.9rem; color: #cdd6f4; line-height: 1.7;
     background: #181825; border-radius: 8px; padding: 12px 16px;
+    white-space: pre-wrap;
 }
 </style>
 """, unsafe_allow_html=True)
 
 st.title("📺 삼프로TV 온디맨드 대시보드")
-st.caption("버튼을 누르면 지정 기간의 영상을 수집·요약합니다. 처리된 영상은 캐시에 저장되어 재호출 시 비용이 발생하지 않습니다.")
+st.caption("버튼을 누르면 지정 기간의 영상을 전부 수집·요약합니다. 처리된 영상은 캐시에 저장되어 재호출 시 비용이 발생하지 않습니다.")
 
 cache = CacheManager()
 
@@ -44,10 +45,6 @@ with st.sidebar:
     with col_e:
         end_date = st.date_input("종료일", value=datetime.date.today(),
             min_value=datetime.date(2020, 1, 1), max_value=datetime.date.today())
-
-    st.subheader("📊 처리 옵션")
-    max_videos = st.slider("최대 영상 수", 5, 50, 20)
-    skip_no_transcript = st.checkbox("자막 없는 영상 건너뛰기", value=True)
 
     st.divider()
     cached_ids = cache.get_all_ids()
@@ -68,7 +65,12 @@ if run_btn:
 
     with st.status("📡 YouTube에서 영상 목록을 가져오는 중...", expanded=True) as status:
         try:
-            videos = fetch_videos_in_range(start_date=start_date, end_date=end_date, max_results=max_videos)
+            # max_results=500으로 설정해 사실상 전체 영상 수집
+            videos = fetch_videos_in_range(
+                start_date=start_date,
+                end_date=end_date,
+                max_results=500,
+            )
             status.update(label=f"✅ {len(videos)}개 영상 발견", state="complete")
         except Exception as e:
             status.update(label=f"❌ 수집 실패: {e}", state="error")
@@ -94,10 +96,12 @@ if run_btn:
     if new_videos:
         progress = st.progress(0, text="신규 영상 요약 중...")
         for i, video in enumerate(new_videos):
-            progress.progress((i + 1) / len(new_videos),
-                text=f"[{i+1}/{len(new_videos)}] {video['title'][:40]}...")
+            progress.progress(
+                (i + 1) / len(new_videos),
+                text=f"[{i+1}/{len(new_videos)}] {video['title'][:40]}..."
+            )
             try:
-                result = summarize_video(video=video, llm="Gemini", skip_no_transcript=skip_no_transcript)
+                result = summarize_video(video=video)
                 cache.save(result)
                 results.append(result)
             except Exception as e:
@@ -109,7 +113,7 @@ if run_btn:
     st.divider()
 
     for r in results:
-        is_cached = r in [cache.get(v["video_id"]) for v in cached_videos]
+        is_cached = r.get("video_id") in [v["video_id"] for v in cached_videos]
         st.markdown(f"""
 <div class="card">
   <div class="card-title">

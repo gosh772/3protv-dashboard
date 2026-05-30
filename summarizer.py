@@ -1,7 +1,6 @@
 """
 summarizer.py
 Gemini API에 YouTube 링크를 직접 전달하여 요약합니다.
-종목 전망/매수매도 의견은 별도로 강조 표시합니다.
 """
 
 import os
@@ -38,7 +37,7 @@ SYSTEM_PROMPT = """당신은 금융·경제 방송 요약 전문가입니다.
 → 현대차 비중 축소 (근거: 환율 리스크)"""
 
 
-def summarize_video(video: dict, llm: str = "Gemini", skip_no_transcript: bool = True) -> dict:
+def summarize_video(video: dict, llm: str = "Gemini", skip_no_transcript: bool = False) -> dict:
     result = dict(video)
     url = video.get("url", "")
     title = video.get("title", "")
@@ -61,7 +60,7 @@ def _call_gemini_with_url(url: str, title: str) -> str:
 
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
+            model_name="gemini-2.0-flash",
             system_instruction=SYSTEM_PROMPT,
         )
 
